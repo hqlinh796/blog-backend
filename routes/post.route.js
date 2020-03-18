@@ -10,12 +10,21 @@ router.get('/', async (req, res, next) => {
           limit = req.query.limit || 5;
 
     try {
-        const postArray = await postModel.find().skip(page*limit).limit(limit);
+        const postArray = await postModel.find().skip(page*limit).limit(limit).populate('comments', '_id');
         //console.log(postArray);
         return res.status(200).json({
             count: postArray.length,
             posts: postArray.map( postSingle => {
-                return postSingle;
+                const {_id, title, cover, description, category, comments, date} = postSingle;
+                return {
+                    _id,
+                    title,
+                    cover,
+                    description,
+                    category,
+                    date,
+                    numOfComments: comments.length
+                }
             })
         }) 
     } catch (error) {
@@ -104,7 +113,7 @@ router.get('/recent-post', async (req, res, next) => {
 router.get('/:postID', async (req, res, next) => {
     const postID = req.params.postID;
     try {
-        const post = await postModel.findById(postID).populate('comments');
+        const post = await postModel.findById(postID).populate('comments', 'name content rate');
         if (post !== null)
             return res.status(200).json(post);
     } catch (error) {
