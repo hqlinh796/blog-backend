@@ -65,6 +65,7 @@ router.get('/search', async (req, res, next) => {
 
         if (posts !== null)
             return res.status(200).json({
+                keyword,
                 count: posts.length,
                 page,
                 totalPages,
