@@ -24,7 +24,7 @@ router.get('/', async (req, res, next) => {
             totalPages,
             hasMore,
             posts: posts.map( postSingle => {
-                const {_id, title, cover, description, category, comments, date} = postSingle;
+                const {_id, title, cover, description, category, comments, date, tags} = postSingle;
                 return {
                     _id,
                     title,
@@ -32,7 +32,8 @@ router.get('/', async (req, res, next) => {
                     description,
                     category,
                     date,
-                    numOfComments: comments.length
+                    numOfComments: comments.length,
+                    tags
                 }
             })
         }) 
@@ -146,6 +147,34 @@ router.get('/:postID', async (req, res, next) => {
     next();
 })
 
+//get related posts
+router.get('/:postID/related-post', async (req, res, next) => {
+    const postID = req.params.postID;
+    const post =  await postModel.findById(postID);
+    const category = post.category; 
+    
+    console.log(category);
+    try {
+        const posts = await postModel.find({category: category, _id : {$ne: postID}}).limit(3);
+       // if (posts.length)
+            return res.status(200).json(
+                posts.map(post => {
+                    const {_id, cover, title} = post;
+                    return {
+                        _id,
+                        cover,
+                        title
+                    }
+                })
+            )
+        next()
+    } catch (error) {
+        return res.status(500).json({
+            message: error.message
+        })
+    }
+})
+
 
 
 //create post
@@ -179,7 +208,24 @@ router.post('/', async(req, res, next) => {
     }
 })
 
-
+//rate
+router.post('/:postID', async (req, res, next) => {
+    const postID = req.params.postID,
+          rate = req.body.rate;
+    try {
+        const post = await postModel.findById(postID);
+        post.rate += rate;
+        post.numRates++;
+        await post.save();
+        res.status(200).json({
+            message: 'Rate Successfully'
+        })
+    } catch (error) {
+        res.status(500).json({
+            message: error.message
+        })
+    }
+})
 
 escapeSpace = (text) => text.replace(/\s/g, "\\$&",);
 

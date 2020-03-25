@@ -9,6 +9,7 @@ const postSchema = mongoose.Schema({
     date: {type: Date, default: Date.now},
     content: {type: String, required: true},
     cover: {type: String, required: true},
+    numRates: {type: Number, default: 0},
     rate: {type: Number, default: 0},
     tags: {type: Array, default: []},
     comments: [ { type: mongoose.Schema.Types.ObjectId, ref: 'comments' } ]
