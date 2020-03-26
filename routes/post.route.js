@@ -82,8 +82,8 @@ router.get('/search', async (req, res, next) => {
     }
 })
 
-//get top post
-router.get('/top-post', async (req, res, next) => {
+//get top favorite post
+router.get('/top-rate', async (req, res, next) => {
     try {
         const posts = await postModel.aggregate([
             {"$project": {
@@ -94,9 +94,8 @@ router.get('/top-post', async (req, res, next) => {
             }}
         ]).sort({rate: -1}).limit(5);
         if (posts !== null)
-            return res.status(200).json({
-                count: posts.length,
-                posts: posts.map(postSingle => {
+            return res.status(200).json(
+                posts.map(postSingle => {
                     const {title, cover} = postSingle;
                     let rate = postSingle.rate;
                     rate = Math.round(rate*100)/100;
@@ -107,7 +106,7 @@ router.get('/top-post', async (req, res, next) => {
                         rate
                     }
                 })
-            });
+            );
     } catch (error) {
         return res.status(500).json({
             message: error.message
@@ -121,9 +120,8 @@ router.get('/recent-post', async (req, res, next) => {
     try {
         const posts = await postModel.find().sort({date: -1}).limit(5);
         if (posts !== null)
-            return res.status(200).json({
-                count: posts.length,
-                posts: posts.map(postSingle => {
+            return res.status(200).json(
+                posts.map(postSingle => {
                     const {title, cover, date} = postSingle;
                     return {
                         id: postSingle._id,
@@ -132,7 +130,27 @@ router.get('/recent-post', async (req, res, next) => {
                         date
                     }
                 })
-            });
+            );
+    } catch (error) {
+        return res.status(500).json({
+            message: error.message
+        })
+    }
+})
+
+//get top view post
+router.get('/top-view', async (req, res, next) => {
+    try {
+        const posts = await postModel.find().sort({countView: -1}).limit(5);
+        return res.status(200).json(posts.map(post => {
+            const {_id, title, cover, countView} = post;
+            return {
+                _id,
+                title,
+                cover,
+                countView
+            }
+        }));
     } catch (error) {
         return res.status(500).json({
             message: error.message
