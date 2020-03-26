@@ -85,12 +85,21 @@ router.get('/search', async (req, res, next) => {
 //get top post
 router.get('/top-post', async (req, res, next) => {
     try {
-        const posts = await postModel.find().sort({rate: -1}).limit(5);
+        const posts = await postModel.aggregate([
+            {"$project": {
+                _id: 1,
+                title: 1,
+                cover: 1,
+                rate: {"$avg": "$rate"}
+            }}
+        ]).sort({rate: -1}).limit(5);
         if (posts !== null)
             return res.status(200).json({
                 count: posts.length,
                 posts: posts.map(postSingle => {
-                    const {title, cover, rate} = postSingle;
+                    const {title, cover} = postSingle;
+                    let rate = postSingle.rate;
+                    rate = Math.round(rate*100)/100;
                     return {
                         id: postSingle._id,
                         title,
@@ -136,8 +145,10 @@ router.get('/:postID', async (req, res, next) => {
     const postID = req.params.postID;
     try {
         const post = await postModel.findById(postID).populate('comments', 'name content rate');
+        post.countView++;
+        const newPost = await post.save();
         if (post !== null)
-            return res.status(200).json(post);
+            return res.status(200).json(newPost);
     } catch (error) {
         console.log(error);
         return res.status(500).json({
@@ -180,12 +191,14 @@ router.get('/:postID/related-post', async (req, res, next) => {
 //create post
 router.post('/', async(req, res, next) => {
     const { title, description, author, category, content, cover, tags } = req.body;
+    const date = Date.now();
    // console.log("ok ne");
     const newPost = new postModel({
         
         title,
         description,
         author,
+        date,
         category,
         content,
         cover,
@@ -209,13 +222,12 @@ router.post('/', async(req, res, next) => {
 })
 
 //rate
-router.post('/:postID', async (req, res, next) => {
-    const postID = req.params.postID,
-          rate = req.body.rate;
+router.post('/rate', async (req, res, next) => {
+    const {postID, rate} = req.body;
     try {
         const post = await postModel.findById(postID);
-        post.rate += rate;
-        post.numRates++;
+        
+        post.rate.push(rate);
         await post.save();
         res.status(200).json({
             message: 'Rate Successfully'
@@ -229,5 +241,6 @@ router.post('/:postID', async (req, res, next) => {
 
 escapeSpace = (text) => text.replace(/\s/g, "\\$&",);
 
+calulateAverage = (arr) => arr.reduce((total, value) => total += value)/arr.length;
 
 module.exports = router;

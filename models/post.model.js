@@ -6,11 +6,11 @@ const postSchema = mongoose.Schema({
     description: String,
     author: {type: String, default: 'Linh Hà'},
     category: {type: String, required: true},
-    date: {type: Date, default: Date.now},
+    date: {type: Number, required: true},
     content: {type: String, required: true},
     cover: {type: String, required: true},
-    numRates: {type: Number, default: 0},
-    rate: {type: Number, default: 0},
+    rate: [],
+    countView: {type: Number, default: 0},
     tags: {type: Array, default: []},
     comments: [ { type: mongoose.Schema.Types.ObjectId, ref: 'comments' } ]
 })
