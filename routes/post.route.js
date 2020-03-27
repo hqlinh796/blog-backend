@@ -96,11 +96,11 @@ router.get('/top-rate', async (req, res, next) => {
         if (posts !== null)
             return res.status(200).json(
                 posts.map(postSingle => {
-                    const {title, cover} = postSingle;
+                    const {_id, title, cover} = postSingle;
                     let rate = postSingle.rate;
                     rate = Math.round(rate*100)/100;
                     return {
-                        id: postSingle._id,
+                        _id,
                         title,
                         cover,
                         rate
@@ -122,9 +122,9 @@ router.get('/recent-post', async (req, res, next) => {
         if (posts !== null)
             return res.status(200).json(
                 posts.map(postSingle => {
-                    const {title, cover, date} = postSingle;
+                    const {title, cover, date, _id} = postSingle;
                     return {
-                        id: postSingle._id,
+                        _id,
                         title,
                         cover,
                         date
