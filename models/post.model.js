@@ -9,10 +9,9 @@ const postSchema = mongoose.Schema({
     date: {type: Number, required: true},
     content: {type: String, required: true},
     cover: {type: String, required: true},
-    rate: [],
-    countView: {type: Number, default: 0},
-    tags: {type: Array, default: []},
-    comments: [ { type: mongoose.Schema.Types.ObjectId, ref: 'comments' } ]
+    rating: [],
+    views: {type: Number, default: 0},
+    tags: {type: Array, default: []}
 })
 
 module.exports = mongoose.model('posts', postSchema);

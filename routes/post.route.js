@@ -8,23 +8,51 @@ const postModel = require('../models/post.model');
 router.get('/', async (req, res, next) => {
     const page = parseInt(req.query.page || 0),
           limit = parseInt(req.query.limit || 2);
-
+    let sort = req.query.sort;
+    
     try {
-        const  [totalPosts, posts] = await Promise.all(  
-            [   postModel.count(),
-                postModel.find().skip(page*limit).limit(limit).populate('comments', '_id')
-             ])
+        let totalPosts, posts;
+        if (sort !== 'rating') {
+            [totalPosts, posts] = await Promise.all(
+                    [postModel.count(),
+                    postModel
+                        .find()
+                        .sort({ [sort]: -1 })
+                        .skip(page * limit)
+                        .limit(limit)
+                    ])
+        } else { 
+            [totalPosts, posts] = await Promise.all(
+                [postModel.count(),
+                postModel
+                    .aggregate([{
+                        "$project": {
+                            _id: 1,
+                            title: 1,
+                            cover: 1,
+                            description: 1,
+                            category: 1,
+                            date: 1,
+                            tags: 1,
+                            rating: { "$avg": "$rating" }
+                        }
+                    }])
+                    .sort({rating: -1})
+                    .skip(page * limit)
+                    .limit(limit)
+                ])
+        }
+
         const totalPages = Math.ceil(totalPosts/limit) - 1,
               hasMore = page < totalPages;
-        //postModel.find().skip(page*limit).limit(limit).populate('comments', '_id');
-        //console.log(posts);
+
         return res.status(200).json({
             count: posts.length,
             page,
             totalPages,
             hasMore,
             posts: posts.map( postSingle => {
-                const {_id, title, cover, description, category, comments, date, tags} = postSingle;
+                const {_id, title, cover, description, category, date, tags} = postSingle;
                 return {
                     _id,
                     title,
@@ -32,7 +60,6 @@ router.get('/', async (req, res, next) => {
                     description,
                     category,
                     date,
-                    numOfComments: comments.length,
                     tags
                 }
             })
@@ -83,27 +110,27 @@ router.get('/search', async (req, res, next) => {
 })
 
 //get top favorite post
-router.get('/top-rate', async (req, res, next) => {
+router.get('/top-rating', async (req, res, next) => {
     try {
         const posts = await postModel.aggregate([
             {"$project": {
                 _id: 1,
                 title: 1,
                 cover: 1,
-                rate: {"$avg": "$rate"}
+                rating: {"$avg": "$rating"}
             }}
-        ]).sort({rate: -1}).limit(5);
+        ]).sort({rating: -1}).limit(5);
         if (posts !== null)
             return res.status(200).json(
                 posts.map(postSingle => {
                     const {_id, title, cover} = postSingle;
-                    let rate = postSingle.rate;
-                    rate = Math.round(rate*100)/100;
+                    let rating = postSingle.rating;
+                    rating = Math.round(rating*100)/100;
                     return {
                         _id,
                         title,
                         cover,
-                        rate
+                        rating
                     }
                 })
             );
@@ -141,14 +168,14 @@ router.get('/recent-post', async (req, res, next) => {
 //get top view post
 router.get('/top-view', async (req, res, next) => {
     try {
-        const posts = await postModel.find().sort({countView: -1}).limit(5);
+        const posts = await postModel.find().sort({views: -1}).limit(5);
         return res.status(200).json(posts.map(post => {
-            const {_id, title, cover, countView} = post;
+            const {_id, title, cover, views} = post;
             return {
                 _id,
                 title,
                 cover,
-                countView
+                views
             }
         }));
     } catch (error) {
@@ -162,8 +189,8 @@ router.get('/top-view', async (req, res, next) => {
 router.get('/:postID', async (req, res, next) => {
     const postID = req.params.postID;
     try {
-        const post = await postModel.findById(postID).populate('comments', 'name content rate');
-        post.countView++;
+        const post = await postModel.findById(postID);
+        post.views++;
         const newPost = await post.save();
         if (post !== null)
             return res.status(200).json(newPost);
@@ -241,11 +268,11 @@ router.post('/', async(req, res, next) => {
 
 //rate
 router.post('/rate', async (req, res, next) => {
-    const {postID, rate} = req.body;
+    const {postID, rating} = req.body;
     try {
         const post = await postModel.findById(postID);
         
-        post.rate.push(rate);
+        post.rating.push(rating);
         await post.save();
         res.status(200).json({
             message: 'Rate Successfully'
