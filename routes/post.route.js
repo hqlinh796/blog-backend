@@ -7,8 +7,8 @@ const postModel = require('../models/post.model');
 //get all post
 router.get('/', async (req, res, next) => {
     const page = parseInt(req.query.page || 0),
-          limit = parseInt(req.query.limit || 2);
-    let sort = req.query.sort;
+          limit = parseInt(req.query.limit || 2),
+          sort = req.query.sort;
     
     try {
         let totalPosts, posts;
@@ -76,33 +76,72 @@ router.get('/', async (req, res, next) => {
 router.get('/search', async (req, res, next) => {
     const keyword = req.query.keyword || '',
           page = parseInt(req.query.page || 0),
-          limit = parseInt(req.query.limit || 2);
+          limit = parseInt(req.query.limit || 2),
+          sort = req.query.sort || 'date';
 
     const keyRex =  new RegExp(escapeSpace(keyword), 'gi');
     //console.log("sau khi escape: " + keyRex);
 
     try {
-        const  [totalPosts, posts] = await Promise.all(  
-            [   postModel.count({title: keyRex}),
-                postModel.find({title: keyRex})
-                         .skip(page*limit)
-                         .limit(limit)
-             ])
+        let totalPosts, posts;
+        if (sort !== 'rating') {
+            [totalPosts, posts] = await Promise.all(
+                    [postModel.count(),
+                    postModel
+                        .find({title: keyRex})
+                        .sort({ [sort]: -1 })
+                        .skip(page * limit)
+                        .limit(limit)
+                    ])
+        } else { 
+            [totalPosts, posts] = await Promise.all(
+                [postModel.count(),
+                postModel
+                    .aggregate([{
+                        $match: {
+                            title: keyRex
+                        }},
+                        {
+                        $project: {
+                            _id: 1,
+                            title: 1,
+                            cover: 1,
+                            description: 1,
+                            category: 1,
+                            date: 1,
+                            tags: 1,
+                            rating: { "$avg": "$rating" }
+                        }
+                    }])
+                    .sort({rating: -1})
+                    .skip(page * limit)
+                    .limit(limit)
+                ])
+        }
+
         const totalPages = Math.ceil(totalPosts/limit) - 1,
               hasMore = page < totalPages;
 
-        if (posts !== null)
-            return res.status(200).json({
-                keyword,
-                count: posts.length,
-                page,
-                totalPages,
-                hasMore,
-                posts: posts.map(postSingle => {
-                    return postSingle;
-                })
-            });
+        return res.status(200).json({
+            count: posts.length,
+            page,
+            totalPages,
+            hasMore,
+            posts: posts.map( postSingle => {
+                const {_id, title, cover, description, category, date, tags} = postSingle;
+                return {
+                    _id,
+                    title,
+                    cover,
+                    description,
+                    category,
+                    date,
+                    tags
+                }
+            })
+        }) 
     } catch (error) {
+        console.log(error);
         return res.status(500).json({
             message: error.message
         })
