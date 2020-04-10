@@ -5,7 +5,7 @@ const postSchema = mongoose.Schema({
     title: {type: String, required: true},
     description: String,
     author: {type: String, default: 'Linh Hà'},
-    category: {type: String, required: true},
+    category: {type: Object, required: true},
     date: {type: Number, required: true},
     content: {type: String, required: true},
     cover: {type: String, required: true},

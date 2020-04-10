@@ -8,25 +8,33 @@ const postModel = require('../models/post.model');
 router.get('/', async (req, res, next) => {
     const page = parseInt(req.query.page || 0),
           limit = parseInt(req.query.limit || 2),
-          sort = req.query.sort;
-    
+          sort = req.query.sort || 'date',
+          category = new RegExp(escapeSpace(req.query.category || ''), 'gi');
     try {
         let totalPosts, posts;
         if (sort !== 'rating') {
             [totalPosts, posts] = await Promise.all(
-                    [postModel.count(),
+                    [postModel
+                        .find({"category.slug": category})
+                        .count(),
                     postModel
-                        .find()
+                        .find({"category.slug": category})
                         .sort({ [sort]: -1 })
                         .skip(page * limit)
                         .limit(limit)
                     ])
         } else { 
             [totalPosts, posts] = await Promise.all(
-                [postModel.count(),
+                [postModel
+                    .find({"category.slug": category})
+                    .count(),
                 postModel
-                    .aggregate([{
-                        "$project": {
+                    .aggregate([
+                        {
+                            $match: {"category.slug": category}
+                    },
+                        { 
+                            $project: {
                             _id: 1,
                             title: 1,
                             cover: 1,
@@ -34,33 +42,35 @@ router.get('/', async (req, res, next) => {
                             category: 1,
                             date: 1,
                             tags: 1,
-                            rating: { "$avg": "$rating" }
+                            rating: 1,
+                            averate_rating: { "$avg": "$rating" }
                         }
                     }])
-                    .sort({rating: -1})
+                    .sort({averate_rating: -1})
                     .skip(page * limit)
                     .limit(limit)
                 ])
         }
-
-        const totalPages = Math.ceil(totalPosts/limit) - 1,
-              hasMore = page < totalPages;
-
+        
+        const totalPages = Math.ceil(totalPosts/limit),
+              hasMore = page + 1 < totalPages;
+        console.log('total page: ' + totalPages);
         return res.status(200).json({
             count: posts.length,
             page,
             totalPages,
             hasMore,
             posts: posts.map( postSingle => {
-                const {_id, title, cover, description, category, date, tags} = postSingle;
+                const {_id, title, cover, description, category, date, tags, rating} = postSingle;
                 return {
                     _id,
                     title,
                     cover,
                     description,
-                    category,
+                    category: category.name,
                     date,
-                    tags
+                    tags,
+                    rating
                 }
             })
         }) 
@@ -77,7 +87,8 @@ router.get('/search', async (req, res, next) => {
     const keyword = req.query.keyword || '',
           page = parseInt(req.query.page || 0),
           limit = parseInt(req.query.limit || 2),
-          sort = req.query.sort || 'date';
+          sort = req.query.sort || 'date',
+          category = new RegExp(escapeSpace(req.query.category || ''), 'gi');
 
     const keyRex =  new RegExp(escapeSpace(keyword), 'gi');
     //console.log("sau khi escape: " + keyRex);
@@ -86,20 +97,25 @@ router.get('/search', async (req, res, next) => {
         let totalPosts, posts;
         if (sort !== 'rating') {
             [totalPosts, posts] = await Promise.all(
-                    [postModel.count(),
+                    [postModel
+                        .find({title: keyRex, "category.slug": category})
+                        .count(),
                     postModel
-                        .find({title: keyRex})
+                        .find({title: keyRex, "category.slug": category})
                         .sort({ [sort]: -1 })
                         .skip(page * limit)
                         .limit(limit)
                     ])
         } else { 
             [totalPosts, posts] = await Promise.all(
-                [postModel.count(),
+                [postModel
+                    .find({title: keyRex, "category.slug": category})
+                    .count(),
                 postModel
                     .aggregate([{
                         $match: {
-                            title: keyRex
+                            title: keyRex,
+                            "category.slug": category
                         }},
                         {
                         $project: {
@@ -110,17 +126,18 @@ router.get('/search', async (req, res, next) => {
                             category: 1,
                             date: 1,
                             tags: 1,
-                            rating: { "$avg": "$rating" }
+                            rating: 1,
+                            average_rating: { "$avg": "$rating" }
                         }
                     }])
-                    .sort({rating: -1})
+                    .sort({average_rating: -1})
                     .skip(page * limit)
                     .limit(limit)
                 ])
         }
 
-        const totalPages = Math.ceil(totalPosts/limit) - 1,
-              hasMore = page < totalPages;
+        const totalPages = Math.ceil(totalPosts/limit),
+              hasMore = page + 1 < totalPages;
 
         return res.status(200).json({
             count: posts.length,
@@ -128,15 +145,16 @@ router.get('/search', async (req, res, next) => {
             totalPages,
             hasMore,
             posts: posts.map( postSingle => {
-                const {_id, title, cover, description, category, date, tags} = postSingle;
+                const {_id, title, cover, description, category, date, tags, rating} = postSingle;
                 return {
                     _id,
                     title,
                     cover,
                     description,
-                    category,
+                    category: category.name,
                     date,
-                    tags
+                    tags,
+                    rating
                 }
             })
         }) 
@@ -231,8 +249,19 @@ router.get('/:postID', async (req, res, next) => {
         const post = await postModel.findById(postID);
         post.views++;
         const newPost = await post.save();
-        if (post !== null)
-            return res.status(200).json(newPost);
+        if (post !== null) {
+            const {title, cover, author, tags, date, content, category, rating} = newPost;
+            return res.status(200).json({
+                title,
+                cover,
+                author,
+                tags,
+                date,
+                content,
+                category: category.name,
+                rating
+            });
+        }
     } catch (error) {
         console.log(error);
         return res.status(500).json({
